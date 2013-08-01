@@ -4,30 +4,51 @@ object Main extends App with RegexParsers {
 
       val model =
         """
-          |model {
+          |btsmodel {
           |
-          | entity Foo {
-          |   id : java.lang.Long
-          |   x : String
-          |   y : String
+          | typedef {
+          |   String -> java.lang.String
+          |   Long -> java.lang.Long
           | }
           |
-          | entity Bar {
-          |   a : String
-          |   b : String
+          | module RBP {
+          |
+          |   entities {
+          |
+          |     entity Foo {
+          |      id : Long
+          |      x : String
+          |      y : String
+          |     }
+          |
+          |    entity Bar {
+          |      a : String
+          |      b : String
+          |    }
+          |
+          |   }
+          | }
+          |
+          | module TM {
+          |      entities {
+          |           entity XYZ {
+          |
+          |           }
+          |      }
           | }
           |
           |}
         """.stripMargin
 
-      def entityBodyParser : Parser[List[Any]]= rep(attributeParser)
 
-      def attributeParser : Parser[Attribute] = (attributeNameParser <~ ":") ~ attributeFullQualifiedTypeNameParser ^^ {
+      def attributeTypeParser = "[a-zA-Z]+".r
+      def attributeNameParser = "[a-zA-Z]+".r
+      def attributeParser : Parser[Attribute] = (attributeNameParser <~ ":") ~ attributeTypeParser ^^ {
         case attributeName ~ fullQualifiedTypeName => Attribute(attributeName, fullQualifiedTypeName)
       }
 
-      def attributeFullQualifiedTypeNameParser = "[a-zA-Z.]+".r
-      def attributeNameParser = "[a-zA-Z]+".r
+
+      def entityBodyParser : Parser[List[Any]]= rep(attributeParser)
       def entityNameParser = "[a-zA-Z]+".r
 
       def entityParser =  "entity" ~> entityNameParser ~ ("{" ~>entityBodyParser <~ "}") ^^ {
@@ -36,8 +57,27 @@ object Main extends App with RegexParsers {
         }
       }
 
-      def modelParser : Parser[Model] = "model" ~ "{" ~> rep(entityParser) <~ "}" ^^ {
-        case entities => Model(entities)
+      def moduleNameParser = "[a-zA-Z]+".r
+      def moduleParser = "module" ~> moduleNameParser ~ ("{" ~> moduleBodyParser <~ "}") ^^ {
+        case moduleName ~ moduleBody => Module(moduleName, moduleBody)
+      }
+
+      def moduleBodyParser : Parser[List[Entity]] = opt("entities" ~ "{" ~> rep(entityParser) <~ "}") ^^ {
+        _.getOrElse(Nil)
+      }
+
+      def modelParser : Parser[Model] = "btsmodel" ~ "{" ~> typedefParser ~ rep(moduleParser) <~ "}" ^^ {
+        case typedefs ~ modules => Model(typedefs, modules)
+      }
+
+      def typeDefNameParser = "[0-9a-zA-Z]+".r
+      def typeDefFullQualifiedNameParser = "[0-9a-zA-Z.]+".r
+      def typedefParser = opt(("typedef" ~ "{") ~> rep(typedefBodyParser) <~ "}") ^^ {
+        _.getOrElse(Nil)
+      }
+
+      def typedefBodyParser : Parser[TypeDef] = typeDefNameParser ~ ("->" ~> typeDefFullQualifiedNameParser) ^^ {
+        case typeDefName ~ typeDefFullQualifiedName => TypeDef(typeDefName,typeDefFullQualifiedName)
       }
 
       parseAll(modelParser, model) match {
@@ -47,6 +87,8 @@ object Main extends App with RegexParsers {
 
 }
 
-case class Model(entities : List[Entity])
+case class Model(typedefs : List[TypeDef], modules : List[Module])
 case class Entity(name : String, attributes : List[Attribute])
-case class Attribute(name : String, fullQualifiedType : String)
+case class Attribute(name : String, _type : String)
+case class TypeDef(name : String, fullQualifiedName : String)
+case class Module(moduleName : String, entities : List[Entity])
