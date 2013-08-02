@@ -30,8 +30,15 @@ object Main extends App with RegexParsers {
           | }
           |
           | module TM {
+          |
           |      entities {
           |           entity XYZ {
+          |
+          |           }
+          |      }
+          |
+          |      tasks {
+          |           task ABC {
           |
           |           }
           |      }
