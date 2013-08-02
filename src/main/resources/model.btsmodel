@@ -1,0 +1,45 @@
+btsmodel {
+
+ typedef {
+   String -> java.lang.String
+   Long -> java.lang.Long
+ }
+
+ module RBP {
+
+   entities {
+
+     entity Foo {
+      id : Long
+      x : String
+      y : String
+     }
+
+    entity Bar {
+      a : String
+      b : String
+    }
+
+   }
+ }
+
+ module TM {
+
+      entities {
+           entity XYZ {
+
+           }
+
+           entity CallRBPTask {
+
+           }
+      }
+
+      tasks {
+
+           task ABC {
+           }
+      }
+ }
+
+}

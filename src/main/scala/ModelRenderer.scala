@@ -4,7 +4,8 @@ object ModelRenderer {
   val NL = "\n"
 
   def render(model: Model): String = {
-    model.modules.map(module => {
+    println(model)
+   /* model.modules.map(module => {
       module.entities.map(entity => {
         "public class " + entity.name + " {" + NL +
         NL +
@@ -27,5 +28,6 @@ object ModelRenderer {
     __ + "public void set"+attribute.name.capitalize+"("+attribute._type+" " + attribute.name + "){" + NL +
     __ + __ + "this."+attribute.name+" = "+attribute.name+";" + NL +
     __ + "}" + NL
-  }).mkString("\n")
+  }).mkString("\n")    */
+   "foobar" }
 }
