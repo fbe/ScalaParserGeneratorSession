@@ -66,71 +66,83 @@ trait BTSModelParsers extends RegexParsers {
   }
 
 
-  def modelParser : Parser[Model] = blockParser("btsmodel"){
-    rep(typeDefContextParser | moduleContextParser)
-  } ^^ {
-    case x => Model(x.blockBody.filter(_.isInstanceOf[TypeDefContext]).map(_.asInstanceOf[TypeDefContext]), x.blockBody.filter(_.isInstanceOf[ModuleContext]).map(_.asInstanceOf[ModuleContext]))
+  def modelParser : Parser[Model] = blockParser("btsmodel", "", rep(typeDefContextParser | moduleContextParser)){
+    (_, _, typeDefOrModuleContextList) => Model(typeDefOrModuleContextList.filter(_.isInstanceOf[TypeDefContext]).map(_.asInstanceOf[TypeDefContext]), typeDefOrModuleContextList.filter(_.isInstanceOf[ModuleContext]).map(_.asInstanceOf[ModuleContext]))
   }
-
 
   case class Block[T](blockMarker : String, blockName : String, blockBody : T)  // TODO invariant?
 
-  def blockParser[T](blockMarkerParser : Parser[String], blockNameParser : Parser[String] = "")(blockBodyParser : Parser[T]) : Parser[Block[T]] = blockMarkerParser ~ blockNameParser ~ ("{" ~> blockBodyParser <~ "}") ^^ {
-    case blockMarker ~ blockName ~ blockBody => Block(blockMarker, blockName, blockBody)
+  /**
+   * Parse a block like this
+   *
+   * blockMarker blockName {
+   *  blockBody
+   * }
+   *
+   * or this if you leave the nameParser as ""
+   *
+   * blockMarker {
+   *  blockBody
+   * }
+   *
+   * @param marker parser of the block marker (string)
+   * @param name parser of the block name (string)
+   * @param body parser of the block body (Parser[B])
+   * @param resultTransformer method to be applied to the parsing result (marker, name, body)
+   * @tparam T the return generic type of the Parser[T]
+   * @tparam B the type of the body to be parsed
+   * @return a parser for parsing the given block
+   */
+  def blockParser[T, B](marker : Parser[String], name : Parser[String], body : Parser[B])(resultTransformer : (String, String, B) => T) : Parser[T] = {
+    marker ~ name ~ ("{" ~> body <~ "}") ^^ {
+      case marker ~ name ~ body => resultTransformer(marker, name, body)
+    }
   }
 
-  def typeDefContextParser : Parser[TypeDefContext] = blockParser("typedef"){
-    rep(typeDefParser)
-  } ^^ {
-    case x : Block[List[TypeDef]] => TypeDefContext(x.blockBody)
+  def typeDefContextParser : Parser[TypeDefContext] = blockParser("typedef", "", rep(typeDefParser)){
+    (blockMarker, blockName, blockBody) => TypeDefContext(blockBody)
   }
 
   def typeDefParser : Parser[TypeDef] = typeDefNameParser ~ "->" ~ typeDefFullQualifiedNameParser ^^ {
     case typeDefName ~ _ ~ fullQualifiedName => TypeDef(typeDefName, fullQualifiedName)
   }
 
-  def moduleContextParser : Parser[ModuleContext] = blockParser("module", moduleNameParser){
-    rep(entityContextParser | taskContextParser)
-  } ^^ {
-    case entityOrTaskContexts => {
-      val entityContexts = entityOrTaskContexts.blockBody.filter(_.isInstanceOf[EntityContext]).map(_.asInstanceOf[EntityContext])
-      val taskContexts =  entityOrTaskContexts.blockBody.filter(_.isInstanceOf[TaskContext]).map(_.asInstanceOf[TaskContext])
+  def moduleContextParser : Parser[ModuleContext] = blockParser("module", moduleNameParser , rep(entityContextParser | taskContextParser)){
+    case (blockMarker, blockName, entityOrTaskContexts) => {
+      val entityContexts = entityOrTaskContexts.filter(_.isInstanceOf[EntityContext]).asInstanceOf[List[EntityContext]]
+      val taskContexts =  entityOrTaskContexts.filter(_.isInstanceOf[TaskContext]).asInstanceOf[List[TaskContext]]
+
+      entityOrTaskContexts.partition(_.isInstanceOf[EntityContext])._1.asInstanceOf[List[EntityContext]]
 
       var entities : List[Entity] = Nil
       var tasks : List[Task] = Nil
 
+
+      entityContexts.foldLeft(List[Entity]())((entityList, ne) => entityList ++ ne.entities)
+
       entityContexts.map(entities ++ _.entities)
       taskContexts.map(tasks ++ _.tasks)
 
-      ModuleContext(entityOrTaskContexts.blockName, EntityContext(entities), TaskContext(tasks))
+      ModuleContext(blockName, EntityContext(entities), TaskContext(tasks))
     }
   }
 
-  def entityContextParser : Parser[EntityContext] = blockParser("entities"){
-    rep(entityParser)
-  } ^^ {
-    case entities : Block[List[Entity]] => EntityContext(entities.blockBody)
+  def entityContextParser : Parser[EntityContext] = blockParser("entities", "", rep(entityParser))((_,_, body) => EntityContext(body))
+
+
+
+  def entityParser : Parser[Entity] = blockParser("entity",  entityNameParser, rep(attributeParser)){
+    (_,entityName, entityBody)  => Entity(entityName, entityBody)
   }
 
-  def entityParser : Parser[Entity] = blockParser("entity", entityNameParser){
-    rep(attributeParser)
-  } ^^ {
-    case entity : Block[List[Attribute]] => Entity(entity.blockName, entity.blockBody)
+  def taskContextParser = blockParser("tasks", "", rep(taskParser)) {
+    (_,_, tasks) => TaskContext
   }
 
-  def taskContextParser = blockParser("tasks") {
-    rep(taskParser)
-  } ^^ {
-    case tasks : Block[List[Task]] => TaskContext(tasks.blockBody)
+  def taskParser : Parser[Task] = blockParser("task", taskNameParser, rep(attributeParser)) {
+    (_, taskName, taskBody) => Task(taskName, taskBody)
   }
 
-  def taskParser : Parser[Task] = blockParser("task", taskNameParser) {
-    rep(attributeParser)
-  }  ^^ {
-    case taskBody : Block[List[Attribute]] => Task(taskBody.blockName, taskBody.blockBody)
-  }
-
-  //case taskContextParser : Parser[TaskContext] =
 
 }
 
