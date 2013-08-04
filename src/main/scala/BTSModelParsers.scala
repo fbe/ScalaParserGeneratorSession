@@ -74,8 +74,6 @@ trait BTSModelParsers extends RegexParsers {
     }
   }
 
-  case class Block[T](blockMarker : String, blockName : String, blockBody : T)  // TODO invariant?
-
   /**
    * Parse a block like this
    *
