@@ -107,23 +107,11 @@ trait BTSModelParsers extends RegexParsers {
     case typeDefName ~ _ ~ fullQualifiedName => TypeDef(typeDefName, fullQualifiedName)
   }
 
-  def moduleContextParser : Parser[ModuleContext] = blockParser("module", moduleNameParser , rep(entityContextParser | taskContextParser)){
+  def moduleContextParser : Parser[ModuleContext] = blockParser("module", moduleNameParser , opt(entityContextParser) ~ opt(taskContextParser)){
     case (blockMarker, blockName, entityOrTaskContexts) => {
-      val entityContexts = entityOrTaskContexts.filter(_.isInstanceOf[EntityContext]).asInstanceOf[List[EntityContext]]
-      val taskContexts =  entityOrTaskContexts.filter(_.isInstanceOf[TaskContext]).asInstanceOf[List[TaskContext]]
-
-      entityOrTaskContexts.partition(_.isInstanceOf[EntityContext])._1.asInstanceOf[List[EntityContext]]
-
-      var entities : List[Entity] = Nil
-      var tasks : List[Task] = Nil
-
-
-      entityContexts.foldLeft(List[Entity]())((entityList, ne) => entityList ++ ne.entities)
-
-      entityContexts.map(entities ++ _.entities)
-      taskContexts.map(tasks ++ _.tasks)
-
-      ModuleContext(blockName, EntityContext(entities), TaskContext(tasks))
+      entityOrTaskContexts match {
+        case entityContext ~ taskContext => ModuleContext(blockName, entityContext.getOrElse(EntityContext(Nil)), taskContext.getOrElse(TaskContext(Nil)))
+      }
     }
   }
 
@@ -136,7 +124,7 @@ trait BTSModelParsers extends RegexParsers {
   }
 
   def taskContextParser = blockParser("tasks", "", rep(taskParser)) {
-    (_,_, tasks) => TaskContext
+    (_,_, tasks) => TaskContext(tasks)
   }
 
   def taskParser : Parser[Task] = blockParser("task", taskNameParser, rep(attributeParser)) {
