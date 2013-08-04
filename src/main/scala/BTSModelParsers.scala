@@ -69,11 +69,11 @@ trait BTSModelParsers extends RegexParsers {
   def modelParser : Parser[Model] = blockParser("btsmodel"){
     rep(typeDefContextParser | moduleContextParser)
   } ^^ {
-    case x : Block[List[Any]] => Model(x.blockBody.filter(_.isInstanceOf[TypeDefContext]).map(_.asInstanceOf[TypeDefContext]), x.blockBody.filter(_.isInstanceOf[ModuleContext]).map(_.asInstanceOf[ModuleContext]))
+    case x => Model(x.blockBody.filter(_.isInstanceOf[TypeDefContext]).map(_.asInstanceOf[TypeDefContext]), x.blockBody.filter(_.isInstanceOf[ModuleContext]).map(_.asInstanceOf[ModuleContext]))
   }
 
 
-  case class Block[+T](blockMarker : String, blockName : String, blockBody : T)  // TODO invariant?
+  case class Block[T](blockMarker : String, blockName : String, blockBody : T)  // TODO invariant?
 
   def blockParser[T](blockMarkerParser : Parser[String], blockNameParser : Parser[String] = "")(blockBodyParser : Parser[T]) : Parser[Block[T]] = blockMarkerParser ~ blockNameParser ~ ("{" ~> blockBodyParser <~ "}") ^^ {
     case blockMarker ~ blockName ~ blockBody => Block(blockMarker, blockName, blockBody)
@@ -92,7 +92,7 @@ trait BTSModelParsers extends RegexParsers {
   def moduleContextParser : Parser[ModuleContext] = blockParser("module", moduleNameParser){
     rep(entityContextParser | taskContextParser)
   } ^^ {
-    case entityOrTaskContexts : Block[List[Product with Serializable]] => {
+    case entityOrTaskContexts => {
       val entityContexts = entityOrTaskContexts.blockBody.filter(_.isInstanceOf[EntityContext]).map(_.asInstanceOf[EntityContext])
       val taskContexts =  entityOrTaskContexts.blockBody.filter(_.isInstanceOf[TaskContext]).map(_.asInstanceOf[TaskContext])
 
@@ -121,7 +121,7 @@ trait BTSModelParsers extends RegexParsers {
   def taskContextParser = blockParser("tasks") {
     rep(taskParser)
   } ^^ {
-    case tasks : Block[Task] => TaskContext(tasks.blockBody)
+    case tasks : Block[List[Task]] => TaskContext(tasks.blockBody)
   }
 
   def taskParser : Parser[Task] = blockParser("task", taskNameParser) {
