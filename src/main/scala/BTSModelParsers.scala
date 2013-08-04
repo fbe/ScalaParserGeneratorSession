@@ -66,8 +66,12 @@ trait BTSModelParsers extends RegexParsers {
   }
 
 
-  def modelParser : Parser[Model] = blockParser("btsmodel", "", rep(typeDefContextParser | moduleContextParser)){
-    (_, _, typeDefOrModuleContextList) => Model(typeDefOrModuleContextList.filter(_.isInstanceOf[TypeDefContext]).map(_.asInstanceOf[TypeDefContext]), typeDefOrModuleContextList.filter(_.isInstanceOf[ModuleContext]).map(_.asInstanceOf[ModuleContext]))
+  def modelParser : Parser[Model] = blockParser("btsmodel", "", opt(typeDefContextParser) ~ rep(moduleContextParser)){
+    case (_, _, body) => {
+      body match {
+        case typedefContext ~ moduleContexts => Model(typedefContext.getOrElse(TypeDefContext(Nil)), moduleContexts)
+      }
+    }
   }
 
   case class Block[T](blockMarker : String, blockName : String, blockBody : T)  // TODO invariant?
@@ -134,7 +138,7 @@ trait BTSModelParsers extends RegexParsers {
 
 }
 
-case class Model(typedefContexts : List[TypeDefContext], modules : List[ModuleContext])
+case class Model(typedefContext : TypeDefContext, modules : List[ModuleContext])
 
 case class TypeDefContext(typedefs : List[TypeDef])
 case class TypeDef(name : String, fullQualifiedName : String)
